@@ -8,7 +8,32 @@ import { api } from '../services/api';
 import { Loading } from '../components/Loading';
 import { Error } from '../components/Error';
 
+interface Image {
+  title: string;
+  description: string;
+  url: string;
+  ts: number;
+  id: string;
+}
+
+interface GetImagesResponse {
+  after: string;
+  data: Image[];
+}
+
 export default function Home(): JSX.Element {
+  // get imagens
+  async function fetchImages({ pageParam = null }): Promise<GetImagesResponse> {
+    const { data } = await api.get('/api/images', {
+      params: {
+        after: pageParam,
+      },
+    });
+
+    return data;
+  }
+
+  // busca de imagens e retorno de nexPageParam para proxima pagina
   const {
     data,
     isLoading,
@@ -16,20 +41,27 @@ export default function Home(): JSX.Element {
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
-  } = useInfiniteQuery(
-    'images',
-    // TODO AXIOS REQUEST WITH PARAM
-    ,
-    // TODO GET AND RETURN NEXT PAGE PARAM
-  );
+  } = useInfiniteQuery('images', fetchImages, {
+    getNextPageParam: lastPage => lastPage?.after || null,
+  });
 
   const formattedData = useMemo(() => {
-    // TODO FORMAT AND FLAT DATA ARRAY
+    // formatando o retorno das imagens para um unico array usando o flatmap
+    const formatted = data?.pages.flatMap(imageData => {
+      return imageData.data.flat();
+    });
+
+    return formatted;
   }, [data]);
 
-  // TODO RENDER LOADING SCREEN
-
-  // TODO RENDER ERROR SCREEN
+  // valida se não deu erro e está carregando
+  if (isLoading && !isError) {
+    return <Loading />;
+  }
+  // valida se não esta mais carregando e deu erro
+  if (!isLoading && isError) {
+    return <Error />;
+  }
 
   return (
     <>
@@ -37,7 +69,15 @@ export default function Home(): JSX.Element {
 
       <Box maxW={1120} px={20} mx="auto" my={20}>
         <CardList cards={formattedData} />
-        {/* TODO RENDER LOAD MORE BUTTON IF DATA HAS NEXT PAGE */}
+        {hasNextPage && (
+          <Button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            mt="6"
+          >
+            {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+          </Button>
+        )}
       </Box>
     </>
   );
